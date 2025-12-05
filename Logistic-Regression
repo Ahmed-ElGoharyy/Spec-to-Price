@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report , confusion_matrix
 
 from preprocessing import preprocess   # <-- IMPORT YOUR PREPROCESSING PIPELINE
 
@@ -42,13 +42,45 @@ print(classification_report(y_test, pred))
 
 
 
-
 testdf = pd.read_csv("Datasets/test.csv")
 
-# Use existing label encoders → fit=False
-test_processed, _ = preprocess(testdf, label_encoders=encoders, fit=False)
+# Extract raw labels
+yt = testdf['price']
 
+# Encode labels
+yt_encoded = yt.map({'expensive': 1, 'non-expensive': 0})
+
+# Remove label column
+testdf_features = testdf.drop(columns=['price'])
+
+# Preprocess using existing encoders
+test_processed, _ = preprocess(
+    testdf_features,
+    label_encoders=encoders,
+    fit=False
+)
+
+# Use only columns present in test set
+valid_features = [f for f in feature_cols if f in test_processed.columns]
+
+# Make sure test_processed contains ALL training features
+for col in feature_cols:
+    if col not in test_processed.columns:
+        print(f"[WARN] Missing in test set -> adding column: {col}")
+        test_processed[col] = 0
+
+# Ensure same column order as training
 X_test_final = test_processed[feature_cols]
+
+# Scale with training scaler
 X_test_final_scaled = scaler.transform(X_test_final)
 
-predictions = model.predict(X_test_final_scaled)
+# Predict
+y_pred = model.predict(X_test_final_scaled)
+
+# Evaluate
+print("Accuracy:", accuracy_score(yt_encoded, y_pred))
+print("\nClassification Report:\n")
+print(classification_report(yt_encoded, y_pred))
+print("\nConfusion Matrix:\n")
+print(confusion_matrix(yt_encoded, y_pred))
